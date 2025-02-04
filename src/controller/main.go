@@ -18,6 +18,7 @@ import (
 	suconfig "github.com/supernetes/supernetes/config/pkg/config"
 	"github.com/supernetes/supernetes/controller/pkg/client"
 	"github.com/supernetes/supernetes/controller/pkg/endpoint"
+	"github.com/supernetes/supernetes/controller/pkg/environment"
 	"github.com/supernetes/supernetes/controller/pkg/node"
 	"github.com/supernetes/supernetes/controller/pkg/tracker"
 	"github.com/supernetes/supernetes/controller/pkg/vk"
@@ -55,11 +56,12 @@ func main() {
 	ep := endpoint.Serve(config)
 	defer ep.Close()
 
-	k8sConfig, err := client.NewK8sConfig()
+	k8sConfig, err := client.NewKubeConfig()
 	log.FatalErr(err).Msg("failed to create K8s client")
 
 	log.FatalErr(vk.DisableKubeProxy(k8sConfig)).Msg("disabling kube-proxy for Virtual Kubelet nodes failed")
 
+	controllerEnv := environment.Load()
 	workloadTracker := tracker.New()
 	ctx := context.Background()
 	nodeReconciler, err := node.NewReconciler(ctx, node.ReconcilerConfig{
@@ -67,7 +69,8 @@ func main() {
 		NodeClient:     ep.Node(),
 		WorkloadClient: ep.Workload(),
 		Tracker:        workloadTracker,
-		K8sConfig:      k8sConfig,
+		KubeConfig:     k8sConfig,
+		Environment:    controllerEnv,
 	})
 	log.FatalErr(err).Msg("failed to create node reconciler")
 	workloadReconciler, err := workload.NewReconciler(ctx, workload.ReconcilerConfig{
